@@ -1,0 +1,48 @@
+#!/usr/bin/env php
+<?php
+
+use Faker\Factory;
+
+require_once dirname(__DIR__) . '/tests/bootstrap.php';
+
+################################################################################
+# Setup
+################################################################################
+$root = dirname(__DIR__, 1);
+$testFiles = $root . '/example';
+$testDir = $root . '/build/example';
+$prefill = $testDir . '/bin/prefill';
+
+$fake = Factory::create();
+
+$answers = [
+    'authorName' => $fake->name(),
+    'authorEmail' => $fake->email(),
+    'authorGithub' => $fake->slug(1),
+
+    'packageName' => $fake->slug(1),
+    'packageWebsite' => $fake->url(),
+    'packageDescription' => $fake->sentence(),
+
+    'psr4Namespace' => ucwords("{$fake->word()}\\{$fake->word()}", '\\'),
+];
+
+################################################################################
+# Run
+################################################################################
+// $answers = implode('\n', $answers);
+
+if (file_exists($testDir)) {
+    shell_exec("rm -rf {$testDir}");
+}
+
+mkdir($testDir, 0777, true);
+shell_exec("cp -r {$testFiles}/. {$testDir}");
+chdir($testDir);
+
+(function ($__prefill__, $__answers__) {
+    extract($__answers__);
+    shell_exec('composer install');
+
+    require $__prefill__;
+})($prefill, $answers);

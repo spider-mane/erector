@@ -1,0 +1,23 @@
+{
+  "name": ":vendor_name/:package_name",
+  "description": ":package_description",
+  "type": "library",
+  "homepage": ":package_website",
+  "keywords": [
+    ":package_name",
+    ":vendor_name"
+  ],
+  "authors": [
+    {
+      "name": ":package_author",
+      "email": ":author_email",
+      "homepage": ":author_website",
+      "role": "Developer"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      ":psr4_namespace": "src/"
+    }
+  }
+}

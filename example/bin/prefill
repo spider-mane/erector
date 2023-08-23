@@ -1,0 +1,175 @@
+#!/usr/bin/env php
+<?php
+
+use Laravel\Prompts\TextPrompt;
+use WebTheory\Erector\Action\AutoloadDumper;
+use WebTheory\Erector\Action\DirectoryKeeper;
+use WebTheory\Erector\Action\FileCopier;
+use WebTheory\Erector\Action\FilenameChanger;
+use WebTheory\Erector\Action\FileRemover;
+use WebTheory\Erector\Action\FileTransformer;
+use WebTheory\Erector\Action\GitInitiator;
+use WebTheory\Erector\Action\Message;
+use WebTheory\Erector\BaseResolver;
+use WebTheory\Erector\Builder;
+use WebTheory\Erector\CallableReplacements;
+use WebTheory\Erector\LaravelPrompt;
+use WebTheory\Erector\LegacyPrompt;
+use WebTheory\Erector\Transformation\JsonMerger;
+use WebTheory\Erector\Transformation\TextReplacer;
+
+################################################################################
+# Configurations
+################################################################################
+
+$root = dirname(__DIR__, 1);
+$stubs = $root . '/__prefill__';
+
+// allow defaults to be passed to script for testing
+$authorName = $authorName ?? trim(shell_exec('git config user.name'));
+$authorEmail = $authorEmail ?? trim(shell_exec('git config user.email'));
+$packageName = $packageName ?? strtolower(preg_replace('/[^A-Za-z0-9-]+/', '-', basename($root)));
+
+$authorGithub = $authorGithub ?? '';
+$packageDescription = $packageDescription ?? '';
+$psr4Namespace = $psr4Namespace ?? '';
+
+// files to transform
+$boilerplate = array_merge(
+    glob($stubs . '/*'),
+    array_map(fn ($file) => $root . $file, [
+        //
+    ]),
+    ...array_map(fn ($file) => glob($root . $file), [
+        '/src/*.php',
+    ]),
+);
+
+// files whose output target does not correspond to its own relative path
+$locations = [
+    'package.json' => 'assets',
+];
+
+// files where user input needs to be further refined
+$filters = [];
+
+$replacements = [
+    # text
+    'PseudoVendor\\PseudoPackage' => 'psr4_namespace',
+    'pseudo-package' => 'package_name',
+
+    # placeholders
+    ':package_name' => 'package_name',
+    ':package_website' => 'package_website',
+    ':package_description' => 'package_description',
+    ':package_author' => 'author_name',
+    ':author_username' => 'author_github_username',
+    ':author_website' => 'author_website',
+    ':author_email' => 'author_email',
+    ':vendor_name' => 'vendor_name',
+    ':vendor_github' => 'vendor_github',
+    ':vendor_website' => 'vendor_website',
+    ':psr4_namespace' => fn ($values) => str_replace('\\', '\\\\', $values['psr4_namespace']) . '\\\\',
+    ':system_year' => fn () => date('Y'),
+];
+
+// json files whose contents should be merged with a functional counterpart
+$json = [
+    'composer.json' => function (array $base, array $stub): array {
+        $composer = array_replace_recursive($base, $stub);
+
+        $composer['authors'] = $stub['authors'];
+        $composer['keywords'] = $stub['keywords'];
+        $composer['autoload']['psr-4'] = $stub['autoload']['psr-4'];
+
+        return $composer;
+    },
+    'assets/package.json' => function (object $base, array $stub): array {
+        $package = array_replace_recursive((array) $base, (array) $stub);
+
+        return $package;
+    },
+];
+
+// files to rename
+$rename = [];
+
+// files to copy to root directory
+$copy = [];
+
+// files to delete
+$remove = ['bin/prefill'];
+
+$keep = ['bin'];
+
+$message = "Done! \e[1;37;44m#StandWith\e\e[0;30;43mUkraine\e[0m\n";
+
+$clean = ['__prefill__'];
+
+################################################################################
+# Prompt
+################################################################################
+
+$legacyFields = [
+    'author_name' => ['Your name', '', $authorName],
+    'author_email' => ['Your email address', '', $authorEmail],
+    'author_github_username' => ['Your Github username', '<username> in https://github.com/username', $authorGithub],
+    'author_website' => ['Your website', '', 'https://github.com/{author_github_username}'],
+
+    'vendor_name' => ['Vendor name', '', '{author_github_username}'],
+    'vendor_github' => ['Vendor Github username', '<username> in https://github.com/username', '{vendor_name}'],
+    'vendor_website' => ['Vendor website', '', 'https://github.com/{vendor_name}'],
+
+    'package_name' => ['Package name', '', $packageName],
+    'package_website' => ['Package website', '', 'https://github.com/{vendor_github}/{package_name}'],
+    'package_description' => ['Brief description of package', '', $packageDescription],
+
+    'psr4_namespace' => ['PSR-4 namespace', 'Vendor\\Package', $psr4Namespace],
+];
+
+$laravelFields = [
+    'author_name' => new TextPrompt('Your name', '', $authorName),
+    'author_email' => new TextPrompt('Your email address', '', $authorEmail),
+    'author_github_username' => new TextPrompt('Your Github username', '<username> in https://github.com/username', $authorGithub),
+    'author_website' => new TextPrompt('Your website', '', 'https://github.com/{author_github_username}'),
+
+    'vendor_name' => new TextPrompt('Vendor name', '', '{author_github_username}'),
+    'vendor_github' => new TextPrompt('Vendor Github username', '<username> in https://github.com/username', '{vendor_name}'),
+    'vendor_website' => new TextPrompt('Vendor website', '', 'https://github.com/{vendor_name}'),
+
+    'package_name' => new TextPrompt('Package name', '', $packageName),
+    'package_website' => new TextPrompt('Package website', '', 'https://github.com/{vendor_github}/{package_name}'),
+    'package_description' => new TextPrompt('Brief description of package', '', $packageDescription),
+
+    'psr4_namespace' => new TextPrompt('PSR-4 namespace', 'Vendor\\Package', $psr4Namespace),
+];
+
+$consent = 'Modify files with these values and create new git repository?';
+
+################################################################################
+# Process
+################################################################################
+
+$replacements = new CallableReplacements($replacements);
+$baseResolver = new BaseResolver($locations, $root, $stubs);
+
+$builder = new Builder(
+    new FileTransformer(
+        $boilerplate,
+        $filters,
+        $baseResolver,
+        new TextReplacer($replacements),
+        new JsonMerger($root, $json),
+    ),
+    new FilenameChanger(new CallableReplacements($rename)),
+    new GitInitiator(),
+    new AutoloadDumper(),
+    new FileRemover(...$remove),
+    new FileCopier(...$copy),
+    new DirectoryKeeper(...$keep),
+    new Message($message),
+    new FileRemover(...$clean)
+);
+
+// $builder->build($root, new LegacyPrompt($legacyFields, $consent));
+$builder->build($root, new LaravelPrompt($laravelFields, $consent));

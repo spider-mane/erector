@@ -1,0 +1,6 @@
+{
+  "name": "vendor/package",
+  "extra": {
+    "empty-object": {}
+  }
+}

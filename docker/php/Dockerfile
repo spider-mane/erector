@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 as app
+FROM ubuntu:22.04 AS app
 
 COPY --from=spidermane/trunk * /trunk
 
@@ -19,10 +19,10 @@ RUN /trunk/setups/language
 ENV TRUNK_USER=erector
 RUN /trunk/setups/user
 
-ARG NODE_VERSION=18
+ARG NODE_VERSION=20
 RUN /trunk/provisions/node --version "$NODE_VERSION"
 
-ARG PHP_VERSION=8.0
+ARG PHP_VERSION=8.1
 RUN /trunk/provisions/php --version "$PHP_VERSION" --dev true
 
 RUN /trunk/setups/entrypoint
@@ -34,7 +34,7 @@ HEALTHCHECK CMD [ "docker-healthcheck" ] --interval=1s --timeout=1s
 RUN /trunk/actions/cleanup
 
 ### build with enhanced interactive features ###
-FROM app as app-interactive
+FROM app AS app-interactive
 
 COPY --from=spidermane/trunk * /trunk
 

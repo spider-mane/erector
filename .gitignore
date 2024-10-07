@@ -6,13 +6,13 @@
 /dist/
 /logs/
 /temp/
+captainhook.config.json
+cghooks.lock
 
 # Composer
 /vendor/
 composer.lock
-/studio.json
-captainhook.config.json
-cghooks.lock
+/pathagist.json
 
 # Docker
 docker-compose.override.yml

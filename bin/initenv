@@ -5,7 +5,7 @@ readonly root="$(dirname $(dirname $(realpath $0)))"
 readonly files=(
   .env.example
   docker-compose.override.example.yml
-  studio.example.json
+  pathagist.example.json
 )
 
 for file in ${files[@]}; do

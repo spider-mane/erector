@@ -41,8 +41,9 @@ COPY --from=spidermane/trunk * /trunk
 ARG UNMINIMIZE=false
 RUN /trunk/actions/unminimize "$UNMINIMIZE"
 
-ARG LOCAL_REPOSITORY=/studio
-RUN /trunk/provisions/studio --path "$LOCAL_REPOSITORY"
+ARG LOCAL_REPOSITORY=/packages
+VOLUME [ "$LOCAL_REPOSITORY" ]
+RUN /trunk/provisions/pathagist --path "$LOCAL_REPOSITORY"
 
 ARG GIT_USER
 ARG GIT_EMAIL
